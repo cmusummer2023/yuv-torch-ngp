@@ -31,6 +31,7 @@ from torch_ema import ExponentialMovingAverage
 from packaging import version as pver
 import lpips
 from torchmetrics.functional import structural_similarity_index_measure
+import wandb
 
 def custom_meshgrid(*args):
     # ref: https://pytorch.org/docs/stable/generated/torch.meshgrid.html?highlight=meshgrid#torch.meshgrid
@@ -350,7 +351,8 @@ class Trainer(object):
         self.fp16 = fp16
         self.best_mode = best_mode
         self.use_loss_as_metric = use_loss_as_metric
-        self.report_metric_at_train = report_metric_at_train
+        #self.report_metric_at_train = report_metric_at_train
+        self.report_metric_at_train = True 
         self.max_keep_ckpt = max_keep_ckpt
         self.eval_interval = eval_interval
         self.use_checkpoint = use_checkpoint
@@ -359,6 +361,7 @@ class Trainer(object):
         self.scheduler_update_every_step = scheduler_update_every_step
         self.device = device if device is not None else torch.device(f'cuda:{local_rank}' if torch.cuda.is_available() else 'cpu')
         self.console = Console()
+        self.time_start = time.time()
 
         model.to(self.device)
         if self.world_size > 1:
@@ -488,8 +491,8 @@ class Trainer(object):
             return pred_rgb, None, loss
 
         images = data['images'] # [B, N, 3/4]
-
-        B, N, C = images.shape
+        #print("hi shape: ", images.shape)
+        B, N, C = images.shape  
 
         if self.opt.color_space == 'linear':
             images[..., :3] = srgb_to_linear(images[..., :3])
@@ -498,9 +501,9 @@ class Trainer(object):
             bg_color = 1
         # train with random background color if not using a bg model and has alpha channel.
         else:
-            #bg_color = torch.ones(3, device=self.device) # [3], fixed white background
+            bg_color = torch.ones(3, device=self.device) # [3], fixed white background
             #bg_color = torch.rand(3, device=self.device) # [3], frame-wise random.
-            bg_color = torch.rand_like(images[..., :3]) # [N, 3], pixel-wise random.
+            #bg_color = torch.rand_like(images[..., :3]) # [N, 3], pixel-wise random.
 
         if C == 4:
             gt_rgb = images[..., :3] * images[..., 3:] + bg_color * (1 - images[..., 3:])
@@ -512,8 +515,13 @@ class Trainer(object):
     
         pred_rgb = outputs['image']
 
+        #change pred_rgb back into RGB to compare with gt_rgb
+        #print(pred_rgb.shape)
+
         # MSE loss
         loss = self.criterion(pred_rgb, gt_rgb).mean(-1) # [B, N, 3] --> [B, N]
+
+        #wandb.log({"loss": loss})
 
         # patch-based rendering
         if self.opt.patch_size > 1:
@@ -893,12 +901,14 @@ class Trainer(object):
 
         average_loss = total_loss / self.local_step
         self.stats["loss"].append(average_loss)
+        wandb.log({"loss": loss})
 
         if self.local_rank == 0:
             pbar.close()
             if self.report_metric_at_train:
                 for metric in self.metrics:
                     self.log(metric.report(), style="red")
+                    wandb.log({"psnr" : metric.measure(), "epoch": self.epoch, "time":time.time() - self.time_start})
                     if self.use_tensorboardX:
                         metric.write(self.writer, self.epoch, prefix="train")
                     metric.clear()
@@ -966,6 +976,7 @@ class Trainer(object):
 
                     for metric in self.metrics:
                         metric.update(preds, truths)
+
 
                     # save image
                     save_path = os.path.join(self.workspace, 'validation', f'{name}_{self.local_step:04d}_rgb.png')

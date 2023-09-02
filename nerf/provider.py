@@ -11,6 +11,7 @@ import trimesh
 
 import torch
 from torch.utils.data import DataLoader
+from .color_utils import * 
 
 from .utils import get_rays
 
@@ -111,6 +112,12 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
+        self.specific_directions = False 
+        self.format_train = '8'
+        self.type_tran = '420'
+
+        self.print_directions_size = False 
+
         # auto-detect transforms.json and split mode.
         if os.path.exists(os.path.join(self.root_path, 'transforms.json')):
             self.mode = 'colmap' # manually split, use view-interpolation for test.
@@ -204,24 +211,43 @@ class NeRFDataset:
                 pose = np.array(f['transform_matrix'], dtype=np.float32) # [4, 4]
                 pose = nerf_matrix_to_ngp(pose, scale=self.scale, offset=self.offset)
 
-                image = cv2.imread(f_path, cv2.IMREAD_UNCHANGED) # [H, W, 3] o [H, W, 4]
-                if self.H is None or self.W is None:
-                    self.H = image.shape[0] // downscale
-                    self.W = image.shape[1] // downscale
+                self.H = 800 // downscale
+                self.W = 800 // downscale
 
-                # add support for the alpha channel as a mask.
-                if image.shape[-1] == 3: 
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                else:
-                    image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
+                if type == 'train':
+                    #img, _ = read_image_rgb_downsample_rgb8(img_path, self.img_wh)
+                    #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb8(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
 
-                if image.shape[0] != self.H or image.shape[1] != self.W:
-                    image = cv2.resize(image, (self.W, self.H), interpolation=cv2.INTER_AREA)
-                    
-                image = image.astype(np.float32) / 255 # [H, W, 3/4]
+                    #img = read_image(img_path, self.img_wh)
+                    #img = read_image_yuv420_8(img_path, self.img_wh)
+                    #img, _ = read_image_rgb_downsample_yuv422(img_path, self.img_wh)
+                    #img, _ = read_image_rgb_downsample_yuv420(img_path, self.img_wh)
+                    #img = read_image_yuv420(img_path, self.img_wh)
+
+                    #img, _, _, _, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
+                    img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+
+
+                else: #testing and validation datasets 
+                    #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
+
+                    #img,  = read_image(img_path, self.img_wh)
+                    #img, _ = read_image_rgb_downsample_yuv422(img_path, self.img_wh)
+                    #img, _ = read_image_rgb_downsample_yuv420(img_path, self.img_wh)
+                    #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
+
+                    #image, self.H, self.W = read_image(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+                    img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+
+
 
                 self.poses.append(pose)
-                self.images.append(image)
+                self.images.append(img)
             
         self.poses = torch.from_numpy(np.stack(self.poses, axis=0)) # [N, 4, 4]
         if self.images is not None:
@@ -247,10 +273,13 @@ class NeRFDataset:
             self.poses = self.poses.to(self.device)
             if self.images is not None:
                 # TODO: linear use pow, but pow for half is only available for torch >= 1.10 ?
-                if self.fp16 and self.opt.color_space != 'linear':
+                if self.format_train == '8' and self.training:
+                    dtype = torch.uint8
+                elif self.fp16 and self.opt.color_space != 'linear':
                     dtype = torch.half
                 else:
                     dtype = torch.float
+ 
                 self.images = self.images.to(dtype).to(self.device)
             if self.error_map is not None:
                 self.error_map = self.error_map.to(self.device)
@@ -309,10 +338,91 @@ class NeRFDataset:
         }
 
         if self.images is not None:
-            images = self.images[index].to(self.device) # [B, H, W, 3/4]
+            #if test/validation: not flattened image 
+            images = self.images[index].to(self.device) # [B, H, W, 3/4];  B = batch, C = channel
             if self.training:
                 C = images.shape[-1]
-                images = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1)) # [B, N, 3/4]
+                #images = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1)) # [B, N, 3/4]
+                # images.view(B, -1, C) result in (1, 640000, 4) 
+                # torch.stack(C * [rays['inds']], -1) just ensures we're getting the indices of ALL the channels 
+
+                total = self.H * self.W
+                x_pos = rays['inds'] % self.H #tensor of x positions
+                y_pos = (rays['inds'] - x_pos) / self.H #tensor of y positions
+                x_pos = x_pos.int()
+                y_pos = y_pos.int()
+
+                #inferenced as RGB 
+                if self.type_tran == 'rgb':
+                    rgb_rays = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1))
+                    if self.format_train == '8': #need to convert to float32 format 
+                        rgb_rays = rgb_rays.float() / 255.0 
+
+                    images = rgb_rays
+                else:
+                    pix_idxs = rays['inds']
+                    images = images.view(B, -1, C) #(1, 640000, 4)
+
+                    #inferenced as YUV420
+                    if self.type_tran == '420':
+                        #add conversion to from YUV back into RGB 
+                        images = images.view(B, 1200 * 800)
+                        #for YUV420 
+                        y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
+                        u = images[0, (y_pos/2).long() * int(self.H / 2) + (x_pos/2).long() + total]
+                        v = images[0, (y_pos/2).long() * int(self.H / 2) + (x_pos/2).long() + total + int(total/4)]
+                        #results should also be tensors of 1d 
+                        #source: https://stackoverflow.com/questions/6560918/yuv420-to-rgb-conversion
+                        #print(y.shape)
+
+                    #inferenced as YUV422
+                    if self.type_tran == '422':
+                        #for YUV422 
+                        #NOTE: self.rays is (N_img, 64000, 2)
+                        #print(images.shape)
+                        y = images[0, pix_idxs, 0] #(N_img_idxs, pix_idxs); only want first value 
+                        offset = pix_idxs % 2 
+                        u_idxs = pix_idxs - offset #indexes of u
+                        v_idxs = u_idxs + 1 #indexes of v
+                        u = images[0, u_idxs, 1]
+                        v = images[0, v_idxs, 1]
+
+                    if self.format_train == '32': 
+                        #convert back into [0, 255] range
+                        y = y * 255.0
+                        u = u * 255.0
+                        v = v * 255.0
+                        #otherwise, y, u, v are already in [0, 255] 8-bit format 
+
+                    # not sure if i need to preserve the precision 
+                    c = y.long() - 16
+                    d = u.long() - 128
+                    e = v.long() - 128
+
+                    r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
+                    g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
+                    b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
+                    rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
+                    #should have shape of (batch size, 3) 
+                    #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
+                    #normalize again
+                    rgb_rays = rgb_rays / 255.0
+                    images = rgb_rays 
+
+                    #trying to free up some memory?? 
+                    del y 
+                    del u 
+                    del v 
+                    del c 
+                    del d 
+                    del e 
+                    del r 
+                    del g 
+                    del b 
+     
+            #training images need to be in the shape of (B, 4096, 3/4)
+            #print("shape: ", images.shape)
+            
             results['images'] = images
         
         # need inds to update error_map
