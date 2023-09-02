@@ -1,5 +1,9 @@
 # torch-ngp
 
+### How to change data formats of training and testing images
+1. In `nerf\provider.py`, go to line 115-116 and change `self.format_train` to be `8` or `32` to indicate the data type of the values of the images. Then change `self.type_tran` to be `rbg`, `420`, or `422` to indicate the colorspace of your images.
+2. Go to line 216 and uncomment the appropriate function that corresponds with your desired data type and colorspace of your images. 
+
 This repository contains:
 * A pytorch implementation of the SDF and NeRF part (grid encoder, density grid ray sampler) in [instant-ngp](https://github.com/NVlabs/instant-ngp), as described in [_Instant Neural Graphics Primitives with a Multiresolution Hash Encoding_](https://nvlabs.github.io/instant-ngp/assets/mueller2022instant.pdf).
 * A pytorch implementation of [TensoRF](https://github.com/apchenstu/TensoRF), as described in [_TensoRF: Tensorial Radiance Fields_](https://arxiv.org/abs/2203.09517), adapted to instant-ngp's NeRF framework.
