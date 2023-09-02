@@ -112,7 +112,6 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
-        self.specific_directions = False 
         self.format_train = '8'
         self.type_tran = '420'
 
@@ -215,34 +214,41 @@ class NeRFDataset:
                 self.W = 800 // downscale
 
                 if type == 'train':
-                    #img, _ = read_image_rgb_downsample_rgb8(img_path, self.img_wh)
+                    #original RGB32 image
                     #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
+
+                    #downsampled image stored as RGB8 
                     #img, self.H, self.W = read_image_rgb8(f_path, self.H, self.W, downscale)
+
+                    #downsampled image stored as RGB32
                     #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
 
-                    #img = read_image(img_path, self.img_wh)
-                    #img = read_image_yuv420_8(img_path, self.img_wh)
-                    #img, _ = read_image_rgb_downsample_yuv422(img_path, self.img_wh)
-                    #img, _ = read_image_rgb_downsample_yuv420(img_path, self.img_wh)
-                    #img = read_image_yuv420(img_path, self.img_wh)
-
+                    #downsampled image stored as YUV422 8 
                     #img, _, _, _, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
+
+                    #downsampled image stored as YUV420 8
                     img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+
+                    #downsampled image (through YUV420) stored as RGB32 
                     #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+
+                    #downsamples image (through YUV422) stored as RGB32
                     #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
 
 
                 else: #testing and validation datasets 
+                    #original RGB32 
                     #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
 
-                    #img,  = read_image(img_path, self.img_wh)
-                    #img, _ = read_image_rgb_downsample_yuv422(img_path, self.img_wh)
-                    #img, _ = read_image_rgb_downsample_yuv420(img_path, self.img_wh)
+                    #downsampled image (through RGB8) stored as RGB32
                     #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
-
-                    #image, self.H, self.W = read_image(f_path, self.H, self.W, downscale)
-                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+                    
+                    #downsampld image (through YUV420) stored as RGB32
                     img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+
+                    #downsampled image (through YUV422) stored as RGB32
+                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+                   
 
 
 
