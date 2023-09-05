@@ -112,8 +112,8 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
-        self.format_train = '8'
-        self.type_tran = '420'
+        self.format_train = '32'
+        self.type_tran = 'rgb'
 
         self.print_directions_size = False 
 
@@ -227,14 +227,18 @@ class NeRFDataset:
                     #img, _, _, _, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
 
                     #downsampled image stored as YUV420 8
-                    img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
 
                     #downsampled image (through YUV420) stored as RGB32 
                     #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
 
                     #downsamples image (through YUV422) stored as RGB32
                     #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+                    
+                    #downsamples image (through BGGR) stored as RGB32
+                    img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
 
+                    
 
                 else: #testing and validation datasets 
                     #original RGB32 
@@ -244,11 +248,13 @@ class NeRFDataset:
                     #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
                     
                     #downsampld image (through YUV420) stored as RGB32
-                    img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+                    #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
 
                     #downsampled image (through YUV422) stored as RGB32
                     #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
                    
+                    #downsamples image (through BGGR) stored as RGB32
+                    img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
 
 
 
@@ -400,32 +406,54 @@ class NeRFDataset:
                         v = v * 255.0
                         #otherwise, y, u, v are already in [0, 255] 8-bit format 
 
-                    # not sure if i need to preserve the precision 
-                    c = y.long() - 16
-                    d = u.long() - 128
-                    e = v.long() - 128
+                    if self.type_train != "bggr": 
+                        # not sure if i need to preserve the precision 
+                        c = y.long() - 16
+                        d = u.long() - 128
+                        e = v.long() - 128
 
-                    r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
-                    g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
-                    b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
-                    rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
-                    #should have shape of (batch size, 3) 
-                    #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
-                    #normalize again
-                    rgb_rays = rgb_rays / 255.0
-                    images = rgb_rays 
+                        r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
+                        g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
+                        b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
+                        rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
+                        #should have shape of (batch size, 3) 
+                        #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
+                        #normalize again
+                        rgb_rays = rgb_rays / 255.0
+                        images = rgb_rays 
 
-                    #trying to free up some memory?? 
-                    del y 
-                    del u 
-                    del v 
-                    del c 
-                    del d 
-                    del e 
-                    del r 
-                    del g 
-                    del b 
-     
+                        #trying to free up some memory?? 
+                        del y 
+                        del u 
+                        del v 
+                        del c 
+                        del d 
+                        del e 
+                        del r 
+                        del g 
+                        del b 
+                    
+                    if self.type_tran == 'bggr':
+                        img = images[0] #(800, 800)
+                        pixel = lambda x,y : {
+                            0: [ img[x][y] , (img[x][y-1] + img[x-1][y] + img[x+1][y] + img[x][y+1]) / 4 ,  (img[x-1][y-1] + img[x+1][y-1] + img[x-1][y+1] + img[x+1][y+1]) / 4 ] ,
+                            1: [ (img[x-1][y] + img[x+1][y])  / 2,img[x][y] , (img[x][y-1] + img[x][y+1]) / 2 ],
+                            2: [(img[x][y-1] + img[x][y+1]) / 2 ,img[x][y], (img[x-1][y] + img[x+1][y]) / 2],
+                            3: [(img[x-1][y-1] + img[x+1][y-1] + img[x-1][y+1] + img[x+1][y+1]) / 4 , (img[x][y-1] + img[x-1][y] + img[x+1][y] + img[x][y+1]) / 4 ,img[x][y] ]
+                        } [  x % 2 + (y % 2)*2]
+
+                        ind = x_pos % 2 + (y_pos % 2)*2 #0, 1, 2, 3 [B]
+                        #[4, 4096, 3/4]
+                        
+
+
+                        pixs = pixel(x_pos, y_pos)
+                        inp = pixs.permute(2, 1, 0).contiguous() # []
+
+
+
+
+                        
             #training images need to be in the shape of (B, 4096, 3/4)
             #print("shape: ", images.shape)
             

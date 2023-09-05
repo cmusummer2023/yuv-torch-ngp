@@ -101,9 +101,16 @@ if __name__ == '__main__':
         density_scale=1,
         min_near=opt.min_near,
         density_thresh=opt.density_thresh,
-        bg_radius=opt.bg_radius,
+        bg_radius=opt.bg_radius)
+    '''
+        num_layers=2, 
+        hidden_dim=32,
+        num_layers_color=3,
+        hidden_dim_color=32,
+        num_layers_bg=2,
+        hidden_dim_bg=32
     )
-    
+    '''
     print(model)
 
     criterion = torch.nn.MSELoss(reduction='none')
