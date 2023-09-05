@@ -112,8 +112,16 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
+<<<<<<< HEAD
         self.format_train = '32'
         self.type_tran = 'rgb'
+=======
+        self.format_train = str(self.opt.loader_bitsize)
+        self.type_tran = self.opt.loader_format
+        # self.format_train = '8'
+        # self.type_tran = '420'
+
+>>>>>>> 3c012a543e5a56c11e11a2cae5c41d484d27eaa9
 
         self.print_directions_size = False 
 
@@ -215,19 +223,44 @@ class NeRFDataset:
 
                 if type == 'train':
                     #original RGB32 image
-                    #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
+                    if self.format_train == '32' and self.type_tran == 'rgb':
+                        img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
 
                     #downsampled image stored as RGB8 
-                    #img, self.H, self.W = read_image_rgb8(f_path, self.H, self.W, downscale)
+                    elif self.format_train == '8' and self.type_tran == 'rgb':
+                        img, self.H, self.W = read_image_rgb8(f_path, self.H, self.W, downscale)
 
                     #downsampled image stored as RGB32
+                    elif self.format_train == '32' and self.type_tran == '420':
+                        img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+
+                    #downsampled image stored as RGB32
+                    elif self.format_train == '32' and self.type_tran == '422':
+                        img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+
+                    #downsampled image stored as YUV420 8
+                    elif self.format_train == '8' and self.type_tran == '420':
+                        img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+                    
+                    #downsampled image stored as YUV422 8
+                    elif self.format_train == '8' and self.type_tran == '422':
+                        img, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
+
+                    else:
+                        raise NotImplementedError(f'unknown format: {self.format_train} -bit {self.type_tran}')
+
+
                     #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
 
                     #downsampled image stored as YUV422 8 
                     #img, _, _, _, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
 
                     #downsampled image stored as YUV420 8
+<<<<<<< HEAD
                     #img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+=======
+                    # img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+>>>>>>> 3c012a543e5a56c11e11a2cae5c41d484d27eaa9
 
                     #downsampled image (through YUV420) stored as RGB32 
                     #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
