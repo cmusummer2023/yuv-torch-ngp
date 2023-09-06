@@ -112,16 +112,13 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
-<<<<<<< HEAD
-        self.format_train = '32'
-        self.type_tran = 'rgb'
-=======
         self.format_train = str(self.opt.loader_bitsize)
         self.type_tran = self.opt.loader_format
-        # self.format_train = '8'
-        # self.type_tran = '420'
+        self.prep_bitsize = str(self.opt.prep_bitsize)
+        self.prep_format = self.opt.prep_format 
+        #self.format_train = '8'
+        #self.type_tran = 'bggr'
 
->>>>>>> 3c012a543e5a56c11e11a2cae5c41d484d27eaa9
 
         self.print_directions_size = False 
 
@@ -221,74 +218,56 @@ class NeRFDataset:
                 self.H = 800 // downscale
                 self.W = 800 // downscale
 
+
+                # prepping image (i.e. downsampled images)
+                #testing and validation datasets 
+                if self.prep_format == 'rgb' and self.prep_bitsize == '32': 
+                    img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
+
+                elif self.prep_format == 'rgb' and self.prep_bitsize == '8': 
+                    img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
+
+                elif self.prep_format == '420': 
+                    img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
+
+                elif self.prep_format == '422': 
+                    img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+
+                elif self.prep_format == 'bggr':
+                    img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
+
+
+                #loading type -- only used for training images 
                 if type == 'train':
                     #original RGB32 image
-                    if self.format_train == '32' and self.type_tran == 'rgb':
-                        img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
-
+                    #already stored as rgb 32 
+                    
                     #downsampled image stored as RGB8 
-                    elif self.format_train == '8' and self.type_tran == 'rgb':
-                        img, self.H, self.W = read_image_rgb8(f_path, self.H, self.W, downscale)
-
-                    #downsampled image stored as RGB32
-                    elif self.format_train == '32' and self.type_tran == '420':
-                        img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
-
-                    #downsampled image stored as RGB32
-                    elif self.format_train == '32' and self.type_tran == '422':
-                        img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
+                    if self.format_train == '8' and self.type_tran == 'rgb':
+                        img = read_image_rgb8(img)
 
                     #downsampled image stored as YUV420 8
                     elif self.format_train == '8' and self.type_tran == '420':
-                        img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
+                        img = read_image_yuv420_8(img)
                     
+                     #downsampled image stored as YUV420 32
+                    elif self.format_train == '32' and self.type_tran == '420':
+                        img = read_image_yuv420_f32(img)
+
                     #downsampled image stored as YUV422 8
                     elif self.format_train == '8' and self.type_tran == '422':
-                        img, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
+                        img = read_image_yuv422_8(img)
 
-                    else:
-                        raise NotImplementedError(f'unknown format: {self.format_train} -bit {self.type_tran}')
-
-
-                    #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
-
-                    #downsampled image stored as YUV422 8 
-                    #img, _, _, _, self.H, self.W = read_image_yuv422_8(f_path, self.H, self.W, downscale)
-
-                    #downsampled image stored as YUV420 8
-<<<<<<< HEAD
-                    #img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
-=======
-                    # img, self.H, self.W = read_image_yuv420_8(f_path, self.H, self.W, downscale)
->>>>>>> 3c012a543e5a56c11e11a2cae5c41d484d27eaa9
-
-                    #downsampled image (through YUV420) stored as RGB32 
-                    #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
-
-                    #downsamples image (through YUV422) stored as RGB32
-                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
-                    
-                    #downsamples image (through BGGR) stored as RGB32
-                    img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
+                    #downsampled image stored as RGB32
+                    elif self.format_train == '32' and self.type_tran == '422':
+                        img = read_image_yuv422_f32(img)
+                
+                    #downsampled image stored as BGGR 
+                    elif self.format_train == '8' and self.type_tran == 'bggr':
+                        img = read_image_bggr_8(img) 
 
                     
-
-                else: #testing and validation datasets 
-                    #original RGB32 
-                    #img, self.H, self.W = read_image_rgb32(f_path, self.H, self.W, downscale)
-
-                    #downsampled image (through RGB8) stored as RGB32
-                    #img, self.H, self.W = read_image_rgb_downsample_rgb8(f_path, self.H, self.W, downscale)
-                    
-                    #downsampld image (through YUV420) stored as RGB32
-                    #img, self.H, self.W = read_image_rgb_downsample_yuv420(f_path, self.H, self.W, downscale)
-
-                    #downsampled image (through YUV422) stored as RGB32
-                    #img, self.H, self.W = read_image_rgb_downsample_yuv422(f_path, self.H, self.W, downscale)
-                   
-                    #downsamples image (through BGGR) stored as RGB32
-                    img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
-
+            
 
 
                 self.poses.append(pose)
@@ -439,7 +418,7 @@ class NeRFDataset:
                         v = v * 255.0
                         #otherwise, y, u, v are already in [0, 255] 8-bit format 
 
-                    if self.type_train != "bggr": 
+                    if self.type_tran != "bggr": 
                         # not sure if i need to preserve the precision 
                         c = y.long() - 16
                         d = u.long() - 128
@@ -468,20 +447,68 @@ class NeRFDataset:
                     
                     if self.type_tran == 'bggr':
                         img = images[0] #(800, 800)
-                        pixel = lambda x,y : {
-                            0: [ img[x][y] , (img[x][y-1] + img[x-1][y] + img[x+1][y] + img[x][y+1]) / 4 ,  (img[x-1][y-1] + img[x+1][y-1] + img[x-1][y+1] + img[x+1][y+1]) / 4 ] ,
-                            1: [ (img[x-1][y] + img[x+1][y])  / 2,img[x][y] , (img[x][y-1] + img[x][y+1]) / 2 ],
-                            2: [(img[x][y-1] + img[x][y+1]) / 2 ,img[x][y], (img[x-1][y] + img[x+1][y]) / 2],
-                            3: [(img[x-1][y-1] + img[x+1][y-1] + img[x-1][y+1] + img[x+1][y+1]) / 4 , (img[x][y-1] + img[x-1][y] + img[x+1][y] + img[x][y+1]) / 4 ,img[x][y] ]
-                        } [  x % 2 + (y % 2)*2]
-
-                        ind = x_pos % 2 + (y_pos % 2)*2 #0, 1, 2, 3 [B]
-                        #[4, 4096, 3/4]
                         
 
+                        '''
+                        pixel = lambda x,y : {
+                              0:  [ (img[x-1, y-1] + img[x+1, y-1] + img[x-1, y+1] + img[x+1, y+1]) / 4 , (img[x, y-1] + img[x-1, y] + img[x+1, y] + img[x, y+1]) / 4 ,  img[x, y] ],
+                              1:  [ (img[x, y-1] + img[x, y+1]) / 2  ,img[x, y] , (img[x-1, y] + img[x+1, y])  / 2],
+                              2:  [  (img[x-1, y] + img[x+1, y]) / 2 ,img[x, y], (img[x, y-1] + img[x, y+1]) / 2 ], 
+                              3: [ img[x, y] , (img[x, y-1] + img[x-1, y] + img[x+1, y] + img[x, y+1]) / 4 , (img[x-1, y-1] + img[x+1, y-1] + img[x-1, y+1] + img[x+1, y+1]) / 4 ]
+                    
+                        } [  x % 2 + (y % 2)*2]
+                        
+                        pix = torch.zeros((1, 4096, 3))
+                        for i in range(4096): 
+                            xx = int(x[0, i])
+                            yy = int(y[0, i])
+                            if xx >= 1 and xx < 800 - 2: 
+                                if yy >= 1 and yy < 800 - 2: 
+                                    pix[0, i] = torch.Tensor(pixel(xx, yy))
+                        '''
 
-                        pixs = pixel(x_pos, y_pos)
-                        inp = pixs.permute(2, 1, 0).contiguous() # []
+                        x_pos = x_pos.long()
+                        y_pos = y_pos.long() 
+
+                        ind = x_pos % 2 + (y_pos % 2)*2 #0, 1, 2, 3 [B]
+                        #res = [4, 4096, 3/4]
+                        #res = np.zeros ( [4, pix_idxs.shape[0], 3] )
+
+                        #x, y = (0, 799) -- need to be in between (1, 798) 
+
+
+                        x_pos_1 = torch.where(x_pos > 0, 1, x_pos) #turn 0 to 1
+                        x_pos_798 = torch.where(x_pos_1 < 799, 798, x_pos_1) #turn 799 to 798 
+
+                        y_pos_1 = torch.where(y_pos > 0, 1, y_pos) #turn 0 to 1
+                        y_pos_798 = torch.where(y_pos_1 < 799, 798, y_pos_1)
+
+                        x = x_pos_798
+                        y = y_pos_798
+
+                        pix0 = torch.cat([ (img[x-1, y-1] + img[x+1, y-1] + img[x-1, y+1] + img[x+1, y+1]) / 4 , (img[x, y-1] + img[x-1, y] + img[x+1, y] + img[x, y+1]) / 4 ,  img[x, y] ], dim=0)
+                        pix1 = torch.cat([ (img[x, y-1] + img[x, y+1]) / 2  ,img[x, y] , (img[x-1, y] + img[x+1, y])  / 2], dim=0)
+                        pix2 = torch.cat([ (img[x-1, y] + img[x+1, y]) / 2 ,img[x, y], (img[x, y-1] + img[x, y+1]) / 2 ], dim=0)
+                        pix3 = torch.cat([ img[x, y] , (img[x, y-1] + img[x-1, y] + img[x+1, y] + img[x, y+1]) / 4 , (img[x-1, y-1] + img[x+1, y-1] + img[x-1, y+1] + img[x+1, y+1]) / 4 ], dim=0)
+                        #print(pix0.shape)
+                        all_pix = torch.stack((pix0, pix1, pix2, pix3)) 
+                        #print(all_pix.shape)
+                        all_pix = all_pix.permute(2, 0, 1) #[4096, 4, 3]
+                        #print(all_pix.shape)
+                        ind = ind.long()
+                        ind = torch.squeeze(ind)
+                        torch_v = torch.arange(0, all_pix.shape[0])
+                        #print(torch_v)
+                        torch_v = torch_v.to(self.device)
+                        pix = all_pix[torch_v, ind] #should be [4096, 3]
+                        pix = torch.unsqueeze(pix, 0)
+                        #print("pix: ", pix.shape)
+                        #print("ind: ", ind.shape)
+                        
+
+                        images = pix.float() / 255.0 
+                        images = images.to(self.device)
+
 
 
 

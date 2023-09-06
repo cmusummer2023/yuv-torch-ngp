@@ -64,9 +64,9 @@ if __name__ == '__main__':
     parser.add_argument('--clip_text', type=str, default='', help="text input for CLIP guidance")
     parser.add_argument('--rand_pose', type=int, default=-1, help="<0 uses no rand pose, =0 only uses rand pose, >0 sample one rand pose every $ known poses")
     parser.add_argument('--loader_bitsize', type=int, default=32, help="bitsize of numbers in dataloader",choices=[32,8])
-    parser.add_argument('--loader_format',type=str, default='rgb', help="format of dataloader",choices=['rgb','420','422'])
+    parser.add_argument('--loader_format',type=str, default='rgb', help="format of dataloader",choices=['rgb','420','422','bggr'])
     parser.add_argument('--prep_bitsize', type=int, default=32, help="bitsize of numbers in prep",choices=[32,8])
-    parser.add_argument('--prep_format',type=str, default='rgb', help="format of prep",choices=['rgb','420','422'])
+    parser.add_argument('--prep_format',type=str, default='rgb', help="format of prep",choices=['rgb','420','422','bggr'])
 
     opt = parser.parse_args()
 
