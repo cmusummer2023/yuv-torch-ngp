@@ -393,42 +393,18 @@ class NeRFDataset:
 
                     #inferenced as YUV422
                     if self.type_tran == '422':
-                        #images = [B x (n + (n/2) * n)]
-                        # If n = 800
-                        # [1 x 1200 x 800]
-                        # First 800 rows represents Y values
-                        # Next 400 rows represent U and V values
-                        # Of the next 400 rows, first 400 cols represent U values.
-                        # Of the next 400 rows, last 400 cols represent V values.
-
-                        # Write a system of querying Y, U, V values given rays.
-                        # rays['inds'] are of size [B, n_rays]
-
                         images = images.view(B, -1)
-                        #for YUV422 
+
                         y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
-                        u = images[0, (y_pos).long() * int(self.W / 2) + (x_pos/2).long() + total]
-                        v = images[0, (y_pos).long() * int(self.W / 2) + (x_pos/2).long() + total + int(total/2)]
-                        #results should also be tensors of 1d
-
-                        YUV2RGB = np.linalg.inv(RGB2YUV)
-                        v2 = torch.zeros_like(y, dtype=torch.float32)
-                        v2[:, 0::2] = v 
-                        v2[:, 1::2] = v 
-        
-                        u2 = torch.zeros_like(y, dtype=torch.float32)
-                        u2[:, 0::2] = u
-                        u2[:, 1::2] = u
-
-                        u2 -= 0.5
-                        v2 -= 0.5
-
-                        YUV_2 = np.dstack((y, u2, v2))
-                        yuv_columns = YUV_2.transpose(2,0,1).reshape(3,-1)
-                        rgb_img = YUV2RGB @ yuv_columns
-                        rgb_img = rgb_img.reshape(3, H, W).transpose(1,2,0)
-                        images = rgb_img
-
+                        u = images[0, (y_pos).long() * int(self.W) + (x_pos/2).long() + total]
+                        v = images[0, (y_pos).long() * int(self.W) + (x_pos/2).long() + total + int(self.W/2)]
+                        
+                        YUV2RGB = torch.tensor(np.linalg.inv(RGB2YUV)).to(self.device).half() # TODO: write as constant
+                        yuv_collated = torch.stack((y.flatten(), u.flatten(), v.flatten()))
+                        rgb_collated = YUV2RGB @ yuv_collated
+                        rgb_collated = torch.transpose(rgb_collated, 0, 1) # From 3 x N to N x 3
+                        rgb_collated = torch.clamp(rgb_collated, min=0, max=1) # Clamping values 
+                        images = rgb_collated.unsqueeze(0) # To 1 x N x 3
 
                     if self.format_train == '32': 
                         #convert back into [0, 255] range
@@ -438,20 +414,20 @@ class NeRFDataset:
                         #otherwise, y, u, v are already in [0, 255] 8-bit format 
 
                     # if self.type_tran != "bggr": 
-                    #     # not sure if i need to preserve the precision 
-                    #     c = y.long() - 16
-                    #     d = u.long() - 128
-                    #     e = v.long() - 128
+                    # #     # not sure if i need to preserve the precision 
+                    #      c = y.long() - 16
+                    #      d = u.long() - 128
+                    #      e = v.long() - 128
 
-                    #     r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
-                    #     g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
-                    #     b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
-                    #     rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
+                    #      r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
+                    #      g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
+                    #      b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
+                    #      rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
                     #     #should have shape of (batch size, 3) 
-                    #     #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
-                    #     #normalize again
-                    #     rgb_rays = rgb_rays / 255.0
-                    #     images = rgb_rays 
+                          #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
+                          #normalize again
+                        #  rgb_rays = rgb_rays / 255.0
+                        #  images = rgb_rays 
 
                     #     #trying to free up some memory?? 
                     #     del y 

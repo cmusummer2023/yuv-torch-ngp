@@ -139,7 +139,7 @@ def read_image_rgb_downsample_yuv422(img_path, H, W, downscale, blend_a=True):
     rgb_img = YUV2RGB @ yuv_columns
     rgb_img = rgb_img.reshape(3, H, W).transpose(1,2,0)
 
-    rgb_img = np.clip(rgb_img, 0, 1)
+    rgb_img = np.clip(rgb_img, 0, 1).astype(np.float32)
 
     return rgb_img, H, W #return as RGB 
 
