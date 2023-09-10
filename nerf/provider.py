@@ -112,13 +112,10 @@ class NeRFDataset:
 
         self.rand_pose = opt.rand_pose
 
-        self.format_train = str(self.opt.loader_bitsize)
-        self.type_tran = self.opt.loader_format
-        self.prep_bitsize = str(self.opt.prep_bitsize)
-        self.prep_format = self.opt.prep_format 
-        #self.format_train = '8'
-        #self.type_tran = 'bggr'
-
+        self.format_train = str(self.opt.loader_bitsize) # bitsize of numbers in dataloader (32/8 only)
+        self.type_tran = self.opt.loader_format # format of dataloader, rgb 420 422 bggr
+        self.prep_bitsize = str(self.opt.prep_bitsize) # bitsize of numbers in prep (32/8)
+        self.prep_format = self.opt.prep_format # format of prep, rgb 420 422 bggr
 
         self.print_directions_size = False 
 
@@ -157,7 +154,6 @@ class NeRFDataset:
             else:
                 with open(os.path.join(self.root_path, f'transforms_{type}.json'), 'r') as f:
                     transform = json.load(f)
-
         else:
             raise NotImplementedError(f'unknown dataset mode: {self.mode}')
 
@@ -174,8 +170,7 @@ class NeRFDataset:
         #frames = sorted(frames, key=lambda d: d['file_path']) # why do I sort...
         
         # for colmap, manually interpolate a test set.
-        if self.mode == 'colmap' and type == 'test':
-            
+        if self.mode == 'colmap' and type == 'test':            
             # choose two random poses, and interpolate between.
             f0, f1 = np.random.choice(frames, 2, replace=False)
             pose0 = nerf_matrix_to_ngp(np.array(f0['transform_matrix'], dtype=np.float32), scale=self.scale, offset=self.offset) # [4, 4]
@@ -218,7 +213,6 @@ class NeRFDataset:
                 self.H = 800 // downscale
                 self.W = 800 // downscale
 
-
                 # prepping image (i.e. downsampled images)
                 #testing and validation datasets 
                 if self.prep_format == 'rgb' and self.prep_bitsize == '32': 
@@ -235,7 +229,6 @@ class NeRFDataset:
 
                 elif self.prep_format == 'bggr':
                     img, self.H, self.W = read_image_rgb_downsample_bggr(f_path, self.H, self.W, downscale)
-
 
                 #loading type -- only used for training images 
                 if type == 'train':
@@ -265,10 +258,6 @@ class NeRFDataset:
                     #downsampled image stored as BGGR 
                     elif self.format_train == '8' and self.type_tran == 'bggr':
                         img = read_image_bggr_8(img) 
-
-                    
-            
-
 
                 self.poses.append(pose)
                 self.images.append(img)
