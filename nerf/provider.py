@@ -411,13 +411,12 @@ class NeRFDataset:
                         v = images[0, (y_pos).long() * int(self.W / 2) + (x_pos/2).long() + total + int(total/2)]
                         #results should also be tensors of 1d
 
-                        from color_utils import RGB2YUV
                         YUV2RGB = np.linalg.inv(RGB2YUV)
-                        v2 = np.zeros(y.shape, dtype=np.uint8)
+                        v2 = torch.zeros_like(y, dtype=torch.float32)
                         v2[:, 0::2] = v 
                         v2[:, 1::2] = v 
         
-                        u2 = np.zeros(y.shape, dtype=np.uint8)
+                        u2 = torch.zeros_like(y, dtype=torch.float32)
                         u2[:, 0::2] = u
                         u2[:, 1::2] = u
 
