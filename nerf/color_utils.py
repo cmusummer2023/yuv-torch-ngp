@@ -111,11 +111,6 @@ def read_image_rgb_downsample_yuv422(img_path, H, W, downscale, blend_a=True):
     u = np.round(np.clip(u, 0, 255)).astype(np.uint8)
     v = np.round(np.clip(v, 0, 255)).astype(np.uint8)
 
-    # Interleave u and v:
-    uv = np.zeros_like(y)
-    uv[:, 0::2] = u
-    uv[:, 1::2] = v
-
     # At this point, Y, U, V have been computed in uint8. Convert back to RGB.
     v2 = np.zeros(y.shape, dtype=np.uint8)
     v2[:, 0::2] = v 
@@ -278,14 +273,13 @@ def read_image_yuv422_8(img):
     u = np.round(np.clip(u, 0, 255)).astype(np.uint8)
     v = np.round(np.clip(v, 0, 255)).astype(np.uint8)
 
-    # Interleave u and v:
-    uv = np.zeros_like(y)
-    uv[:, 0::2] = u
-    uv[:, 1::2] = v
-
-    # Merge y and uv channels
-    yuv422 = cv2.merge((y, uv))
+    # We concatenate it (stack it horizontally), to get one matrix # n x n
+    uv = np.concatenate((u, v), axis=1) # n x n.
     
+    # Merge y and u/v channels into one array.
+    # n*2 x n.
+    yuv422 = np.concatenate((y, uv), axis=0)    
+
     return yuv422
 
 #only applicable to training datasets 
@@ -308,17 +302,17 @@ def read_image_yuv422_f32(img):
     u += 0.5
     v += 0.5
 
-    # # Downsample u/v horizontally
+    # Downsample u/v horizontally
+    # Given an RGB image of dimensions nxnx3, u will be n x n/2 x 1, and v will be n x n/2 x 1
     u = cv2.resize(u, (img_width//2, img_height), interpolation=cv2.INTER_LINEAR)
     v = cv2.resize(v, (img_width//2, img_height), interpolation=cv2.INTER_LINEAR)
 
-    # Interleave u and v:
-    uv = np.zeros_like(y)
-    uv[:, 0::2] = u
-    uv[:, 1::2] = v
-
-    # Merge y and uv channels
-    yuv422 = cv2.merge((y, uv))
+    # We concatenate it (stack it horizontally), to get one matrix # n x n
+    uv = np.concatenate((u, v), axis=1) # n x n.
+    
+    # Merge y and u/v channels into one array.
+    # n*2 x n.
+    yuv422 = np.concatenate((y, uv), axis=0)
 
     return yuv422
 

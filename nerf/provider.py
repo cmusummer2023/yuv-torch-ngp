@@ -355,18 +355,20 @@ class NeRFDataset:
             images = self.images[index].to(self.device) # [B, H, W, 3/4];  B = batch, C = channel
             if self.training:
                 C = images.shape[-1]
-                #images = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1)) # [B, N, 3/4]
-                # images.view(B, -1, C) result in (1, 640000, 4) 
+                # images = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1)) # [B, N, 3/4]
+                # images.view(B, -1, C) result in (1, 640000, 4) NOT ALWAYS - depends on the image data type.
                 # torch.stack(C * [rays['inds']], -1) just ensures we're getting the indices of ALL the channels 
 
+                # Getting x_pos and y_pos from the flattened index used by rays.
                 total = self.H * self.W
-                x_pos = rays['inds'] % self.H #tensor of x positions
-                y_pos = (rays['inds'] - x_pos) / self.H #tensor of y positions
-                x_pos = x_pos.int()
-                y_pos = y_pos.int()
+                x_pos = (rays['inds'] % self.W).int() #tensor of x positions
+                y_pos = ((rays['inds'] - x_pos) / self.W).int() #tensor of y positions
 
                 #inferenced as RGB 
                 if self.type_tran == 'rgb':
+                    # images.view(B, -1, C) converts images to B x H*W x C
+                    # torch.gather along the second dimension
+                    # torch.stack(C * [rays['inds']], -1) makes rays in all 3 dimensions to sample from the image
                     rgb_rays = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1))
                     if self.format_train == '8': #need to convert to float32 format 
                         rgb_rays = rgb_rays.float() / 255.0 
@@ -378,27 +380,36 @@ class NeRFDataset:
 
                     #inferenced as YUV420
                     if self.type_tran == '420':
-                        #add conversion to from YUV back into RGB 
-                        images = images.view(B, 1200 * 800)
+                        #add conversion to from YUV back into RGB
+                        # TODO: this hardcodes the image dimensions. 
+                        images = images.view(B, -1)
                         #for YUV420 
                         y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
-                        u = images[0, (y_pos/2).long() * int(self.H / 2) + (x_pos/2).long() + total]
-                        v = images[0, (y_pos/2).long() * int(self.H / 2) + (x_pos/2).long() + total + int(total/4)]
+                        u = images[0, (y_pos/2).long() * int(self.W / 2) + (x_pos/2).long() + total]
+                        v = images[0, (y_pos/2).long() * int(self.W / 2) + (x_pos/2).long() + total + int(total/4)]
                         #results should also be tensors of 1d 
                         #source: https://stackoverflow.com/questions/6560918/yuv420-to-rgb-conversion
                         #print(y.shape)
 
                     #inferenced as YUV422
                     if self.type_tran == '422':
+                        #images = [B x (n + (n/2) * n)]
+                        # If n = 800
+                        # [1 x 1200 x 800]
+                        # First 800 rows represents Y values
+                        # Next 400 rows represent U and V values
+                        # Of the next 400 rows, first 400 cols represent U values.
+                        # Of the next 400 rows, last 400 cols represent V values.
+
+                        # Write a system of querying Y, U, V values given rays.
+                        # rays['inds'] are of size [B, n_rays]
+
+                        images = images.view(B, -1)
                         #for YUV422 
-                        #NOTE: self.rays is (N_img, 64000, 2)
-                        #print(images.shape)
-                        y = images[0, pix_idxs, 0] #(N_img_idxs, pix_idxs); only want first value 
-                        offset = pix_idxs % 2 
-                        u_idxs = pix_idxs - offset #indexes of u
-                        v_idxs = u_idxs + 1 #indexes of v
-                        u = images[0, u_idxs, 1]
-                        v = images[0, v_idxs, 1]
+                        y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
+                        u = images[0, (y_pos).long() * int(self.W / 2) + (x_pos/2).long() + total]
+                        v = images[0, (y_pos).long() * int(self.W / 2) + (x_pos/2).long() + total + int(total/2)]
+                        #results should also be tensors of 1d 
 
                     if self.format_train == '32': 
                         #convert back into [0, 255] range
