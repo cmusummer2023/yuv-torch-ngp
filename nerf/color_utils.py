@@ -15,10 +15,13 @@ RGB2YUV = np.array([
 ##############################################
 
 """
-Reads in an image from img_path, normalizes to [0,1], blends if needed, 
-sets H / W if no values are provided, and return the preprocessed image.
+1. Reads in an image from img_path
+2. Assumes image is from 0.0 - 255.0, normalizes to [0,1]
+3. Blends image if needed, 
+4. Sets H / W if no values are provided, and return the preprocessed image.
 
-Image is RGB32, with pixel values in [0,1].
+Input image is RGB32, with pixel values in [0.,255.]
+Returned image is RGB32, with pixel values in [0., 1.]
 """
 def read_and_preprocess_image(img_path, H, W, downscale, blend_a):
     img = imageio.imread(img_path).astype(np.float32) / 255.0
@@ -35,12 +38,20 @@ def read_and_preprocess_image(img_path, H, W, downscale, blend_a):
 
     return img, H, W
 
-#read in as regular RGBf32 image
-# RGB32->RGB32->RGB32 
+"""
+read in as regular RGBf32 image
+# RGB32->RGB32->RGB32
+"""
 def read_image_rgb32(img_path, H, W, downscale, blend_a=True):
     return read_and_preprocess_image(img_path, H, W, downscale, blend_a)
 
-""" RGB32->RGB8->RGB32 """
+"""
+1. Uses read_and_preprocess_image to get image that is in range [0., 1.,]
+2. Downsamples to uint8
+3. Upsample back to float32.
+
+RGB32->RGB8->RGB32 
+"""
 def read_image_rgb_downsample_rgb8(img_path, H, W, downscale, blend_a=True): 
     img, H, W = read_and_preprocess_image(img_path, H, W, downscale, blend_a)
     
@@ -56,8 +67,9 @@ def read_image_rgb_downsample_rgb8(img_path, H, W, downscale, blend_a=True):
     #img is not rearranged yet; img_r is rearranged 
     return img, H, W
 
-#Only applicable to test and validation datasets 
-#changing RGB32->YUV420->RGB32
+"""
+RGB32->YUV420->RGB32
+"""
 def read_image_rgb_downsample_yuv420(img_path, H, W, downscale, blend_a=True):
     #read in as RGB, convert to YUV, then convert back into RGB 
     img, H, W = read_and_preprocess_image(img_path, H, W, downscale, blend_a)
@@ -74,14 +86,15 @@ def read_image_rgb_downsample_yuv420(img_path, H, W, downscale, blend_a=True):
     #img is not rearranged 
     return img, H, W
 
-#Only applicable to test and validation datasets 
-#changing RGB->YUV422->RGB
+"""
+RGB32->YUV420->RGB32
+"""
 def read_image_rgb_downsample_yuv422(img_path, H, W, downscale, blend_a=True):
     #read in as RGB, convert to YUV, then convert back into RGB 
     img, H, W = read_and_preprocess_image(img_path, H, W, downscale, blend_a)
 
-    # Vectorizing YUV colorspace transformation    
-    # This flattens the matrix out to a shape of 3 x (n^2)
+    # Step 1: YUV colorspace transformation
+    # Flattens matrix to a shape of 3 x (n^2)
     rgb_columns = img.transpose(2,0,1).reshape(3,-1)
     # Converts from RGB to YUV colorspace.
     yuv_img = RGB2YUV @ rgb_columns
@@ -239,8 +252,22 @@ def read_image_yuv420_f32(img):
 
     return img
 
-# read and STORE as YUV 422 8 bit image from RGB32->YUV422 8->RGB32
-# FROM ORIGINAL IMAGE?? 
+"""
+Takes the preprocessed image that has gone through (img -> yuv422 -> img)
+and converts it to YUV422.
+
+Input: rgb_img in range [0.,1.]
+Output: yuv422 array with the following configuration:
+ ________
+|       |
+|   Y   |
+|       |
+|_______|
+| U | V |
+|   |   |
+|   |   |
+|___|___|
+"""
 def read_image_yuv422_8(img):    
     # Vectorizing YUV colorspace transformation    
     img_width, img_height = img.shape[1], img.shape[0]

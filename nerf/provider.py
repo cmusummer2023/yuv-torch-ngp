@@ -210,7 +210,7 @@ class NeRFDataset:
                 pose = np.array(f['transform_matrix'], dtype=np.float32) # [4, 4]
                 pose = nerf_matrix_to_ngp(pose, scale=self.scale, offset=self.offset)
 
-                self.H = 800 // downscale
+                self.H = 800 // downscale # TODO: THIS is hardcoded
                 self.W = 800 // downscale
 
                 # prepping image (i.e. downsampled images)
@@ -370,7 +370,7 @@ class NeRFDataset:
                     # torch.gather along the second dimension
                     # torch.stack(C * [rays['inds']], -1) makes rays in all 3 dimensions to sample from the image
                     rgb_rays = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1))
-                    if self.format_train == '8': #need to convert to float32 format 
+                    if self.format_train != '8': #need to convert to float32 format 
                         rgb_rays = rgb_rays.float() / 255.0 
 
                     images = rgb_rays
