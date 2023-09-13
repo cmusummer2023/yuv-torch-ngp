@@ -413,32 +413,32 @@ class NeRFDataset:
                         v = v * 255.0
                         #otherwise, y, u, v are already in [0, 255] 8-bit format 
 
-                    # if self.type_tran != "bggr": 
-                    # #     # not sure if i need to preserve the precision 
-                    #      c = y.long() - 16
-                    #      d = u.long() - 128
-                    #      e = v.long() - 128
+                    if self.type_tran != "bggr": 
+                        # not sure if i need to preserve the precision 
+                        c = y.long() - 16
+                        d = u.long() - 128
+                        e = v.long() - 128
 
-                    #      r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
-                    #      g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
-                    #      b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
-                    #      rgb_rays = torch.stack((r,g,b), 2) #create a new dimension? therefore we concatenate along 1st axis 
-                    #     #should have shape of (batch size, 3) 
-                          #cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
-                          #normalize again
-                        #  rgb_rays = rgb_rays / 255.0
-                        #  images = rgb_rays 
+                        r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
+                        g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
+                        b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
+                        rgb_rays = torch.stack((r, g, b), 2) #create a new dimension? therefore we concatenate along 1st axis 
+                    #should have shape of (batch size, 3) 
+                    #   cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
+                    #   normalize again
+                        rgb_rays = rgb_rays / 255.0
+                        images = rgb_rays 
 
-                    #     #trying to free up some memory?? 
-                    #     del y 
-                    #     del u 
-                    #     del v 
-                    #     del c 
-                    #     del d 
-                    #     del e 
-                    #     del r 
-                    #     del g 
-                    #     del b 
+                    #trying to free up some memory?? 
+                    del y 
+                    del u 
+                    del v 
+                    del c 
+                    del d 
+                    del e 
+                    del r 
+                    del g 
+                    del b 
                     
                     if self.type_tran == 'bggr':
                         img = images[0] #(800, 800)
