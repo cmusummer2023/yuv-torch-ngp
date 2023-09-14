@@ -920,6 +920,7 @@ class Trainer(object):
                 self.lr_scheduler.step()
 
         self.log(f"==> Finished Epoch {self.epoch}.")
+        torch.cuda.empty_cache()
 
 
     def evaluate_one_epoch(self, loader, name=None):

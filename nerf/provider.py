@@ -127,6 +127,12 @@ class NeRFDataset:
         else:
             raise NotImplementedError(f'[NeRFDataset] Cannot find transforms*.json under {self.root_path}')
 
+        # Constant needed for computation during train-time using YUV formats.
+        if self.fp16:
+            self.YUV2RGB = torch.tensor(np.linalg.inv(RGB2YUV)).to(self.device).half()
+        else:
+            self.YUV2RGB = torch.tensor(np.linalg.inv(RGB2YUV)).to(self.device).float()
+
         # load nerf-compatible format data.
         if self.mode == 'colmap':
             with open(os.path.join(self.root_path, 'transforms.json'), 'r') as f:
@@ -210,8 +216,8 @@ class NeRFDataset:
                 pose = np.array(f['transform_matrix'], dtype=np.float32) # [4, 4]
                 pose = nerf_matrix_to_ngp(pose, scale=self.scale, offset=self.offset)
 
-                self.H = 800 // downscale # TODO: THIS is hardcoded
-                self.W = 800 // downscale
+                # self.H = 800 // downscale # TODO: THIS is hardcoded
+                # self.W = 800 // downscale
 
                 # prepping image (i.e. downsampled images)
                 #testing and validation datasets 
@@ -317,7 +323,6 @@ class NeRFDataset:
 
 
     def collate(self, index):
-
         B = len(index) # a list of length 1
 
         # random pose without gt images.
@@ -370,9 +375,9 @@ class NeRFDataset:
                     # torch.gather along the second dimension
                     # torch.stack(C * [rays['inds']], -1) makes rays in all 3 dimensions to sample from the image
                     rgb_rays = torch.gather(images.view(B, -1, C), 1, torch.stack(C * [rays['inds']], -1))
-                    if self.format_train != '8': #need to convert to float32 format 
-                        rgb_rays = rgb_rays.float() / 255.0 
 
+                    # if self.format_train != '8': #need to convert to float32 format #TODO: We might not need this anymore.
+                        # rgb_rays = rgb_rays.float() / 255.0 
                     images = rgb_rays
                 else:
                     pix_idxs = rays['inds']
@@ -380,69 +385,35 @@ class NeRFDataset:
 
                     #inferenced as YUV420
                     if self.type_tran == '420':
-                        #add conversion to from YUV back into RGB
-                        # TODO: this hardcodes the image dimensions. 
                         images = images.view(B, -1)
-                        #for YUV420 
+
                         y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
-                        u = images[0, (y_pos/2).long() * int(self.W / 2) + (x_pos/2).long() + total]
-                        v = images[0, (y_pos/2).long() * int(self.W / 2) + (x_pos/2).long() + total + int(total/4)]
-                        #results should also be tensors of 1d 
-                        #source: https://stackoverflow.com/questions/6560918/yuv420-to-rgb-conversion
-                        #print(y.shape)
+                        u = images[0, (y_pos/2).long() * int(self.W) + (x_pos/2).long() + total]
+                        v = images[0, (y_pos/2).long() * int(self.W) + (x_pos/2).long() + total + int(self.W/2)]
+                        
+                        yuv_collated = torch.stack((y.flatten(), u.flatten(), v.flatten()))
+                        rgb_collated = self.YUV2RGB @ yuv_collated
+                        rgb_collated = torch.transpose(rgb_collated, 0, 1) # From 3 x N to N x 3
+                        rgb_collated = torch.clamp(rgb_collated, min=0, max=1) # Clamping values 
+                        images = rgb_collated.unsqueeze(0) # To 1 x N x 3
 
                     #inferenced as YUV422
                     if self.type_tran == '422':
+                        print(images.shape) # 1, 1600, 800
                         images = images.view(B, -1)
 
                         y = images[0, pix_idxs] #(N_img_idxs, pix_idxs)
                         u = images[0, (y_pos).long() * int(self.W) + (x_pos/2).long() + total]
                         v = images[0, (y_pos).long() * int(self.W) + (x_pos/2).long() + total + int(self.W/2)]
                         
-                        YUV2RGB = torch.tensor(np.linalg.inv(RGB2YUV)).to(self.device).half() # TODO: write as constant
                         yuv_collated = torch.stack((y.flatten(), u.flatten(), v.flatten()))
-                        rgb_collated = YUV2RGB @ yuv_collated
+                        rgb_collated = self.YUV2RGB @ yuv_collated
                         rgb_collated = torch.transpose(rgb_collated, 0, 1) # From 3 x N to N x 3
                         rgb_collated = torch.clamp(rgb_collated, min=0, max=1) # Clamping values 
                         images = rgb_collated.unsqueeze(0) # To 1 x N x 3
-
-                    if self.format_train == '32': 
-                        #convert back into [0, 255] range
-                        y = y * 255.0
-                        u = u * 255.0
-                        v = v * 255.0
-                        #otherwise, y, u, v are already in [0, 255] 8-bit format 
-
-                    if self.type_tran != "bggr": 
-                        # not sure if i need to preserve the precision 
-                        c = y.long() - 16
-                        d = u.long() - 128
-                        e = v.long() - 128
-
-                        r = torch.clamp((298 * c + 409 * e + 128) >> 8, min=0, max=255)
-                        g = torch.clamp(( 298 * c - 100 * d - 208 * e + 128) >> 8, min=0, max=255)
-                        b = torch.clamp(( 298 * c + 516 * d + 128) >> 8, min=0, max=255)
-                        rgb_rays = torch.stack((r, g, b), 2) #create a new dimension? therefore we concatenate along 1st axis 
-                    #should have shape of (batch size, 3) 
-                    #   cv2.imwrite("./test_img/test.png", rgb_rays.cpu().numpy())
-                    #   normalize again
-                        rgb_rays = rgb_rays / 255.0
-                        images = rgb_rays 
-
-                    #trying to free up some memory?? 
-                    del y 
-                    del u 
-                    del v 
-                    del c 
-                    del d 
-                    del e 
-                    del r 
-                    del g 
-                    del b 
-                    
+                  
                     if self.type_tran == 'bggr':
                         img = images[0] #(800, 800)
-                        
 
                         '''
                         pixel = lambda x,y : {
@@ -504,11 +475,6 @@ class NeRFDataset:
                         images = pix.float() / 255.0 
                         images = images.to(self.device)
 
-
-
-
-
-                        
             #training images need to be in the shape of (B, 4096, 3/4)
             #print("shape: ", images.shape)
             
